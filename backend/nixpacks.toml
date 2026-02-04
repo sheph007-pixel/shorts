@@ -1,0 +1,15 @@
+# Railway/Nixpacks configuration
+providers = ["python"]
+
+[phases.setup]
+nixPkgs = ["python311", "ffmpeg", "libsndfile", "pkg-config"]
+
+[phases.install]
+dependsOn = ["setup"]
+cmds = ["pip install --no-cache-dir -r requirements.txt"]
+
+[start]
+cmd = "gunicorn app:app --bind 0.0.0.0:${PORT:-5000}"
+
+[variables]
+PYTHON_VERSION = "3.11"

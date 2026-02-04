@@ -27,8 +27,8 @@ interface YouTubeChannel {
 type Step = 'upload' | 'preview' | 'publish' | 'done'
 type Privacy = 'public' | 'unlisted' | 'private'
 
-// Check if we're in demo mode (no backend available)
-const API_BASE = import.meta.env.VITE_API_URL || ''
+// Backend API URL - Render deployment
+const API_BASE = import.meta.env.VITE_API_URL || 'https://shorts-vhea.onrender.com'
 
 function App() {
   const [step, setStep] = useState<Step>('upload')
