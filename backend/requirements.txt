@@ -1,25 +1,23 @@
 # Web Framework
 flask==3.0.0
 flask-cors==4.0.0
+gunicorn==21.2.0
+werkzeug==3.0.1
+python-dotenv==1.0.0
 
-# Audio Processing
-librosa==0.10.1
+# Core packages (lightweight)
 numpy==1.26.2
+Pillow==10.1.0
+
+# Audio (adding these back after basic test)
 scipy==1.11.4
 soundfile==0.12.1
+librosa==0.10.1
 
-# Video Generation
+# Video
 moviepy==1.0.3
-Pillow==10.1.0
 
 # YouTube API
 google-api-python-client==2.108.0
 google-auth-oauthlib==1.1.0
 google-auth-httplib2==0.1.1
-
-# Utilities
-python-dotenv==1.0.0
-werkzeug==3.0.1
-
-# Production Server
-gunicorn==21.2.0
