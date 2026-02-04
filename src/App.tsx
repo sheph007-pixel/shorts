@@ -27,6 +27,9 @@ interface YouTubeChannel {
 type Step = 'upload' | 'preview' | 'publish' | 'done'
 type Privacy = 'public' | 'unlisted' | 'private'
 
+// Check if we're in demo mode (no backend available)
+const API_BASE = import.meta.env.VITE_API_URL || ''
+
 function App() {
   const [step, setStep] = useState<Step>('upload')
   const [session, setSession] = useState<Session | null>(null)
@@ -34,6 +37,7 @@ function App() {
   const [youtubeChannel, setYoutubeChannel] = useState<YouTubeChannel | null>(null)
   const [privacy, setPrivacy] = useState<Privacy>('private')
   const [publishedUrl, setPublishedUrl] = useState<string | null>(null)
+  const [demoMode, setDemoMode] = useState(false)
 
   // Form state
   const [title, setTitle] = useState('')
@@ -66,20 +70,26 @@ function App() {
 
   const checkYouTubeStatus = async () => {
     try {
-      const response = await axios.get('/api/youtube/status')
+      const response = await axios.get(`${API_BASE}/api/youtube/status`)
       if (response.data.connected) {
         setYoutubeChannel(response.data.channel)
       } else {
         setYoutubeChannel(null)
       }
+      setDemoMode(false)
     } catch {
       setYoutubeChannel(null)
+      setDemoMode(true)
     }
   }
 
   const connectYouTube = async () => {
+    if (demoMode) {
+      setError('YouTube connection requires the backend service. Deploy the backend to Railway or Render.')
+      return
+    }
     try {
-      const response = await axios.get('/api/youtube/connect')
+      const response = await axios.get(`${API_BASE}/api/youtube/connect`)
       window.location.href = response.data.auth_url
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message :
@@ -90,7 +100,7 @@ function App() {
 
   const disconnectYouTube = async () => {
     try {
-      await axios.post('/api/youtube/disconnect')
+      await axios.post(`${API_BASE}/api/youtube/disconnect`)
       setYoutubeChannel(null)
     } catch {
       // Ignore errors
@@ -104,7 +114,6 @@ function App() {
     if (droppedFile && droppedFile.type.startsWith('audio/')) {
       setFile(droppedFile)
       if (!title) {
-        // Extract title from filename
         const name = droppedFile.name.replace(/\.[^/.]+$/, '')
         setTitle(name)
       }
@@ -122,23 +131,58 @@ function App() {
     }
   }
 
+  // Generate random waveform for demo
+  const generateDemoWaveform = () => {
+    const waveform = []
+    for (let i = 0; i < 100; i++) {
+      const base = 0.3 + Math.sin(i / 10) * 0.2
+      const noise = Math.random() * 0.3
+      waveform.push(Math.min(1, Math.max(0.1, base + noise)))
+    }
+    return waveform
+  }
+
   const handleUpload = async () => {
     if (!file || !title) return
 
     setUploading(true)
     setError(null)
 
+    // Demo mode: simulate analysis locally
+    if (demoMode) {
+      await new Promise(resolve => setTimeout(resolve, 1500))
+
+      const demoSession: Session = {
+        session_id: `demo-${Date.now()}`,
+        title: title,
+        analysis: {
+          start_time: 15.5,
+          end_time: 30.5,
+          duration: 15,
+          score: 0.85,
+          reason: 'High energy section with strong beat presence (Demo Mode)'
+        },
+        waveform: generateDemoWaveform()
+      }
+
+      setSession(demoSession)
+      setStep('preview')
+      setUploading(false)
+      return
+    }
+
     try {
       const formData = new FormData()
       formData.append('file', file)
       formData.append('title', title)
 
-      const response = await axios.post('/api/upload', formData)
+      const response = await axios.post(`${API_BASE}/api/upload`, formData)
       setSession(response.data)
       setStep('preview')
     } catch (err: unknown) {
-      const errorMessage = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Upload failed'
+      const errorMessage = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Upload failed. Backend may not be running.'
       setError(errorMessage)
+      setDemoMode(true)
     } finally {
       setUploading(false)
     }
@@ -150,8 +194,15 @@ function App() {
     setGenerating(true)
     setError(null)
 
+    if (demoMode) {
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      setError('Video generation requires the backend service with FFmpeg. Deploy backend to Railway/Render for full functionality.')
+      setGenerating(false)
+      return
+    }
+
     try {
-      const response = await axios.post('/api/generate-video', {
+      const response = await axios.post(`${API_BASE}/api/generate-video`, {
         session_id: session.session_id
       })
       setVideoUrl(response.data.video_url)
@@ -170,7 +221,7 @@ function App() {
     setError(null)
 
     try {
-      const response = await axios.post('/api/publish', {
+      const response = await axios.post(`${API_BASE}/api/publish`, {
         session_id: session.session_id,
         privacy
       })
@@ -185,9 +236,9 @@ function App() {
   }
 
   const handleStartOver = async () => {
-    if (session) {
+    if (session && !demoMode) {
       try {
-        await axios.delete(`/api/cleanup/${session.session_id}`)
+        await axios.delete(`${API_BASE}/api/cleanup/${session.session_id}`)
       } catch {
         // Ignore cleanup errors
       }
@@ -212,6 +263,11 @@ function App() {
       <header className="header">
         <div className="container">
           <h1>Music Clip Extractor</h1>
+          {demoMode && (
+            <span style={{ fontSize: 12, color: 'var(--text-secondary)', marginLeft: 12 }}>
+              Demo Mode
+            </span>
+          )}
         </div>
       </header>
 
@@ -227,6 +283,12 @@ function App() {
 
           {error && (
             <div className="status error">{error}</div>
+          )}
+
+          {demoMode && step === 'upload' && (
+            <div className="status loading" style={{ marginBottom: 24 }}>
+              Running in demo mode. For full functionality, deploy the backend service.
+            </div>
           )}
 
           {/* Step 1: Upload */}
