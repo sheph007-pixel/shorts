@@ -5,19 +5,21 @@ gunicorn==21.2.0
 werkzeug==3.0.1
 python-dotenv==1.0.0
 
-# Core packages (lightweight)
-numpy==1.26.2
-Pillow==10.1.0
+# Core - flexible versions for pre-built wheels
+numpy>=1.24.0
+Pillow>=10.0.0
 
-# Audio (adding these back after basic test)
-scipy==1.11.4
-soundfile==0.12.1
-librosa==0.10.1
+# Audio
+scipy>=1.11.0
+soundfile>=0.12.0
+librosa>=0.10.0
 
-# Video
-moviepy==1.0.3
+# Video - with bundled ffmpeg
+moviepy>=1.0.3
+imageio>=2.31.0
+imageio-ffmpeg>=0.4.8
 
 # YouTube API
-google-api-python-client==2.108.0
-google-auth-oauthlib==1.1.0
-google-auth-httplib2==0.1.1
+google-api-python-client>=2.100.0
+google-auth-oauthlib>=1.1.0
+google-auth-httplib2>=0.1.1
