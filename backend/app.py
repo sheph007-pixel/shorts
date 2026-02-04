@@ -19,7 +19,13 @@ from youtube_uploader import YouTubeUploader
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app, origins=['http://localhost:3000', 'http://localhost:5173'])
+# Allow CORS from any origin (configure FRONTEND_URL in production)
+CORS(app, origins=[
+    'http://localhost:3000',
+    'http://localhost:5173',
+    os.environ.get('FRONTEND_URL', 'https://shorts-roan.vercel.app'),
+    'https://*.vercel.app'
+], supports_credentials=True)
 
 # Configuration
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'uploads')
@@ -278,15 +284,14 @@ def youtube_connect():
 @app.route('/oauth/callback', methods=['GET'])
 def oauth_callback():
     """Handle YouTube OAuth callback."""
-    # Get the full URL for the callback
     authorization_response = request.url
+    frontend_url = os.environ.get('FRONTEND_URL', 'https://shorts-roan.vercel.app')
 
     try:
         youtube_uploader.handle_oauth_callback(authorization_response)
-        # Redirect back to the frontend
-        return redirect('http://localhost:3000?youtube_connected=true')
+        return redirect(f'{frontend_url}?youtube_connected=true')
     except Exception as e:
-        return redirect(f'http://localhost:3000?youtube_error={str(e)}')
+        return redirect(f'{frontend_url}?youtube_error={str(e)}')
 
 
 @app.route('/api/youtube/disconnect', methods=['POST'])
@@ -375,4 +380,6 @@ def cleanup_session(session_id):
 
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    port = int(os.environ.get('PORT', 5000))
+    debug = os.environ.get('FLASK_ENV') == 'development'
+    app.run(host='0.0.0.0', debug=debug, port=port)
