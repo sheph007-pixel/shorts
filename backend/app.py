@@ -14,6 +14,8 @@ from dotenv import load_dotenv
 from audio_analyzer import analyze_audio, get_audio_waveform, get_beat_times
 from video_generator import generate_video, generate_preview_thumbnail
 from youtube_uploader import YouTubeUploader
+from youtube_downloader import download_youtube_video, get_video_info
+from simple_video_generator import create_vertical_short, auto_select_clip
 
 # Load environment variables
 load_dotenv()
@@ -294,6 +296,100 @@ def youtube_disconnect():
     """Disconnect YouTube account."""
     youtube_uploader.disconnect()
     return jsonify({'disconnected': True})
+
+
+@app.route('/api/youtube-to-short', methods=['POST'])
+def youtube_to_short():
+    """
+    Create a YouTube Short from a YouTube URL.
+
+    Request:
+        - url: YouTube video URL
+        - title: Text to display on the video (optional, uses video title if not provided)
+        - start_time: Start time in seconds (optional, auto-selects if not provided)
+        - duration: Duration of clip in seconds (20-40 recommended, default 30)
+
+    Response:
+        - session_id: Unique session ID for publishing
+        - video_info: Information about the source video
+        - clip_info: Information about the created clip
+    """
+    data = request.json
+    url = data.get('url')
+    custom_title = data.get('title')
+    start_time = data.get('start_time')
+    duration = data.get('duration', 30)
+
+    if not url:
+        return jsonify({'error': 'YouTube URL is required'}), 400
+
+    # Validate duration
+    if duration < 20 or duration > 40:
+        return jsonify({'error': 'Duration must be between 20 and 40 seconds'}), 400
+
+    try:
+        # Generate session ID
+        session_id = str(uuid.uuid4())
+
+        # Get video info first
+        print(f"Fetching video info for: {url}")
+        video_info = get_video_info(url)
+
+        # Download the video
+        print("Downloading video...")
+        download_result = download_youtube_video(url, UPLOAD_FOLDER)
+        video_path = download_result['file_path']
+
+        # Auto-select clip if start time not provided
+        if start_time is None:
+            start_time, duration = auto_select_clip(video_info['duration'], duration)
+
+        # Use custom title or video title
+        display_title = custom_title if custom_title else video_info['title']
+
+        # Generate the short
+        print(f"Creating short: {duration}s clip starting at {start_time}s")
+        output_path = os.path.join(OUTPUT_FOLDER, f"{session_id}_short.mp4")
+
+        create_vertical_short(
+            video_path=video_path,
+            title=display_title,
+            start_time=start_time,
+            duration=duration,
+            output_path=output_path
+        )
+
+        # Store session
+        sessions[session_id] = {
+            'file_path': video_path,
+            'title': display_title,
+            'video_path': output_path,
+            'source_url': url,
+            'source_info': video_info,
+            'clip_info': {
+                'start_time': start_time,
+                'duration': duration
+            }
+        }
+
+        return jsonify({
+            'session_id': session_id,
+            'video_info': {
+                'title': video_info['title'],
+                'duration': video_info['duration']
+            },
+            'clip_info': {
+                'start_time': start_time,
+                'duration': duration,
+                'title': display_title
+            },
+            'video_url': f'/api/video/{session_id}',
+            'download_url': f'/api/download/{session_id}'
+        })
+
+    except Exception as e:
+        print(f"Error creating short: {e}")
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/publish', methods=['POST'])
